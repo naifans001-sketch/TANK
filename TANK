@@ -1,0 +1,165 @@
+import pygame
+import random
+import sys
+
+# 初始化
+pygame.init()
+
+# 屏幕
+WIDTH, HEIGHT = 600, 400
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("坦克大战")
+
+# 颜色
+BLACK = (0, 0, 0)
+GREEN = (0, 200, 0)
+RED = (200, 0, 0)
+YELLOW = (200, 200, 0)
+WHITE = (255, 255, 255)
+
+# 时钟
+clock = pygame.time.Clock()
+
+# 坦克类
+class Tank(pygame.sprite.Sprite):
+    def __init__(self, x, y, color):
+        super().__init__()
+        self.image = pygame.Surface((30, 30))
+        self.image.fill(color)
+        self.rect = self.image.get_rect(center=(x, y))
+        self.direction = "UP"
+        self.speed = 4
+
+    def update(self, keys=None):
+        if keys:
+            if keys[pygame.K_UP]:
+                self.rect.y -= self.speed
+                self.direction = "UP"
+            elif keys[pygame.K_DOWN]:
+                self.rect.y += self.speed
+                self.direction = "DOWN"
+            elif keys[pygame.K_LEFT]:
+                self.rect.x -= self.speed
+                self.direction = "LEFT"
+            elif keys[pygame.K_RIGHT]:
+                self.rect.x += self.speed
+                self.direction = "RIGHT"
+
+        # 防止出界
+        self.rect.x = max(0, min(WIDTH - self.rect.width, self.rect.x))
+        self.rect.y = max(0, min(HEIGHT - self.rect.height, self.rect.y))
+
+    def fire(self, group, color):
+        bullet = Bullet(self.rect.centerx, self.rect.centery, self.direction, color)
+        group.add(bullet)
+
+
+# 子弹类
+class Bullet(pygame.sprite.Sprite):
+    def __init__(self, x, y, direction, color):
+        super().__init__()
+        self.image = pygame.Surface((6, 6))
+        self.image.fill(color)
+        self.rect = self.image.get_rect(center=(x, y))
+        self.direction = direction
+        self.speed = 6
+
+    def update(self):
+        if self.direction == "UP":
+            self.rect.y -= self.speed
+        elif self.direction == "DOWN":
+            self.rect.y += self.speed
+        elif self.direction == "LEFT":
+            self.rect.x -= self.speed
+        elif self.direction == "RIGHT":
+            self.rect.x += self.speed
+
+        # 出界销毁
+        if (self.rect.x < 0 or self.rect.x > WIDTH or
+                self.rect.y < 0 or self.rect.y > HEIGHT):
+            self.kill()
+
+
+# 初始化玩家和敌人
+player = Tank(WIDTH // 2, HEIGHT - 50, GREEN)
+enemy = Tank(WIDTH // 2, 50, RED)
+
+all_sprites = pygame.sprite.Group()
+all_sprites.add(player, enemy)
+
+player_bullets = pygame.sprite.Group()
+enemy_bullets = pygame.sprite.Group()
+
+# 字体
+font = pygame.font.SysFont("arial", 24)
+
+def show_text(text, color, y):
+    msg = font.render(text, True, color)
+    screen.blit(msg, (WIDTH // 2 - msg.get_width() // 2, y))
+
+# 主循环
+while True:
+    keys = pygame.key.get_pressed()
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+
+        # 玩家开火
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                player.fire(player_bullets, YELLOW)
+
+    # 玩家移动
+    player.update(keys)
+
+    # 敌人随机移动 & 发射
+    if random.randint(1, 50) == 1:  # 敌人偶尔改变方向
+        enemy.direction = random.choice(["UP", "DOWN", "LEFT", "RIGHT"])
+    if random.randint(1, 30) == 1:  # 敌人偶尔发射子弹
+        enemy.fire(enemy_bullets, WHITE)
+
+    # 敌人自动移动
+    if enemy.direction == "UP":
+        enemy.rect.y -= enemy.speed
+    elif enemy.direction == "DOWN":
+        enemy.rect.y += enemy.speed
+    elif enemy.direction == "LEFT":
+        enemy.rect.x -= enemy.speed
+    elif enemy.direction == "RIGHT":
+        enemy.rect.x += enemy.speed
+
+    # 敌人防止出界
+    enemy.rect.x = max(0, min(WIDTH - enemy.rect.width, enemy.rect.x))
+    enemy.rect.y = max(0, min(HEIGHT - enemy.rect.height, enemy.rect.y))
+
+    # 更新子弹
+    player_bullets.update()
+    enemy_bullets.update()
+
+    # 碰撞检测
+    if pygame.sprite.spritecollide(enemy, player_bullets, True):
+        screen.fill(BLACK)
+        show_text("你赢了！", GREEN, HEIGHT // 2)
+        pygame.display.flip()
+        pygame.time.wait(3000)
+        pygame.quit()
+        sys.exit()
+
+    if pygame.sprite.spritecollide(player, enemy_bullets, True):
+        screen.fill(BLACK)
+        show_text("你输了！", RED, HEIGHT // 2)
+        pygame.display.flip()
+        pygame.time.wait(3000)
+        pygame.quit()
+        sys.exit()
+
+    # 绘制
+    screen.fill(BLACK)
+    all_sprites.draw(screen)
+    player_bullets.draw(screen)
+    enemy_bullets.draw(screen)
+
+    pygame.display.flip()
+    clock.tick(30)
